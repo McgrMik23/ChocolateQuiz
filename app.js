@@ -40,14 +40,14 @@ testDatabaseConnection();
 
 app.post('/save-result', async (req, res) => {
     // Input validation
-    if (!req.body || !req.body.result) {
-        console.error('No result provided in the request body');
-        return res.status(400).send('Bad Request: No result provided');
+    if (!req.body || !req.body.result || !req.body.chocoType) {
+        console.error('Incomplete data provided in the request body');
+        return res.status(400).send('Bad Request: Incomplete data provided');
     }
 
     try {
-        const { result } = req.body;
-        console.log('Received result:', result);
+        const { result, chocoType } = req.body;
+        console.log('Received result:', result, 'Chocolate Type:', chocoType);
 
         // Connect to the database
         let pool = await sql.connect(dbConfig);
@@ -55,27 +55,19 @@ app.post('/save-result', async (req, res) => {
 
         // Insert the result into the database
         await pool.request()
-            .input('UserResult', sql.VarChar, result)
-            .query('INSERT INTO QuizResults (UserResult) VALUES (@UserResult)');
+            .input('UserResult', sql.VarChar(50), result)
+            .input('ChocoType', sql.VarChar(4), chocoType)
+            .query('INSERT INTO QuizResults (UserResult, ChocoType) VALUES (@UserResult, @ChocoType)');
         
         console.log('Result saved successfully to the database.');
         res.status(200).send('Result saved!');
     } catch (error) {
         console.error('Error occurred while saving the result:', error);
-
-        if (error.code === 'ESOCKET') {
-            console.error('Database connection failed. Check your network and database settings.');
-            res.status(500).send('Database connection failed.');
-        } else if (error.code === 'ETIMEOUT') {
-            console.error('Database connection timed out.');
-            res.status(500).send('Database connection timed out.');
-        } else {
-            res.status(500).send('An unexpected error occurred while saving the result.');
-        }
+        res.status(500).send('An error occurred while saving the result.');
     } finally {
         // Close the database connection if open
         if (sql.connected) {
-            sql.close();
+            await sql.close();
             console.log('Database connection closed.');
         }
     }
@@ -87,7 +79,7 @@ app.use((err, req, res, next) => {
     res.status(500).send('An unexpected error occurred.');
 });
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8000;
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
